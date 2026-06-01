@@ -10,6 +10,7 @@ import optax
 from flax.training.train_state import TrainState
 
 from models.networks import ActorNetwork, Identity, ValueNetwork
+from utils.encoder_utils import build_encoders
 
 
 class HIQLAgent(flax.struct.PyTreeNode):
