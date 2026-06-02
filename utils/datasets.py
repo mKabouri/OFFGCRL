@@ -54,6 +54,11 @@ class Dataset:
         replace: bool = True,
     ) -> np.ndarray:
         indices = np.arange(len(self), dtype=np.int32) if valid_indices is None else valid_indices
+        if replace:
+            if valid_indices is None:
+                return np.random.randint(len(self), size=batch_size, dtype=np.int32)
+            positions = np.random.randint(len(indices), size=batch_size)
+            return indices[positions].astype(np.int32)
         return np.random.choice(indices, size=batch_size, replace=replace).astype(np.int32)
 
     def get_batch(self, idx: np.ndarray, *names: str) -> dict[str, jnp.ndarray]:

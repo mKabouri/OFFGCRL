@@ -97,6 +97,27 @@ def evaluate(agent, env, num_episodes: int, rng: jax.random.PRNGKey) -> dict:
     }
 
 
+def _reset_for_video(env):
+    try:
+        return env.reset(options={"render_goal": True})
+    except TypeError:
+        return env.reset()
+
+
+def _frame_with_goal(frame, goal_frame):
+    if frame is None:
+        return None
+
+    frame = np.asarray(frame, dtype=np.uint8)
+    if goal_frame is None:
+        return frame
+
+    goal_frame = np.asarray(goal_frame, dtype=np.uint8)
+    if goal_frame.shape == frame.shape:
+        return np.concatenate([goal_frame, frame], axis=0)
+    return frame
+
+
 def record_video(
     agent,
     env,
@@ -111,12 +132,13 @@ def record_video(
     wandb.Video expects shape (T, C, H, W) uint8.
     """
     frames = []
-    obs, info = env.reset()
+    obs, info = _reset_for_video(env)
     goal = info.get("goal", None)
+    goal_frame = info.get("goal_rendered", goal)
     done = False
 
     while not done:
-        frame = env.render()
+        frame = _frame_with_goal(env.render(), goal_frame)
         if frame is not None:
             frames.append(frame)
 
