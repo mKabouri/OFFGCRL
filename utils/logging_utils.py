@@ -15,11 +15,11 @@ def _config_value(value):
     return value
 
 
-def _config_dict(cfg: ml_collections.ConfigDict) -> dict:
+def _config_dict(cfg) -> dict:
     return {key: _config_value(value) for key, value in cfg.items()}
 
 
-def init_wandb(cfg: ml_collections.ConfigDict, agent_cfg: ml_collections.ConfigDict = None, **kwargs):
+def init_wandb(cfg, agent_cfg: ml_collections.ConfigDict = None, **kwargs):
     config = {"training": _config_dict(cfg)}
     if agent_cfg is not None:
         config["agent"] = _config_dict(agent_cfg)
@@ -156,7 +156,7 @@ def record_video(
 
 
 def save_checkpoint(agent, checkpoint_dir: str, step: int):
-    path = os.path.join(checkpoint_dir, f"step_{step}")
+    path = os.path.abspath(os.path.join(checkpoint_dir, f"step_{step}"))
     if os.path.exists(path):
         return
 
@@ -169,7 +169,7 @@ def save_checkpoint(agent, checkpoint_dir: str, step: int):
 
 
 def restore_checkpoint(agent, checkpoint_dir: str, step: int):
-    path = os.path.join(checkpoint_dir, f"step_{step}")
+    path = os.path.abspath(os.path.join(checkpoint_dir, f"step_{step}"))
     checkpointer = ocp.PyTreeCheckpointer()
     checkpoint = {
         "rng": agent.rng,

@@ -3,8 +3,9 @@ from typing import Sequence
 
 import flax.linen as nn
 import jax.numpy as jnp
+import ml_collections
 
-from models.networks import LayerNormMLP, default_init
+from models.networks import Identity, LayerNormMLP, default_init
 
 
 class DrQv2Encoder(nn.Module):
@@ -206,3 +207,12 @@ def make_encoder(name: str | None, **kwargs) -> nn.Module | None:
     if name not in encoder_modules:
         raise ValueError(f"Unknown encoder: {name}. Available encoders: {sorted(encoder_modules)}")
     return encoder_modules[name](**kwargs)
+
+
+def make_observation_encoder(cfg: ml_collections.ConfigDict, observations: jnp.ndarray) -> nn.Module:
+    if cfg.encoder.lower() == "none" or observations.ndim < 4:
+        return Identity()
+    kwargs = {"hidden_dims": (cfg.encoder_feature_dim,)}
+    if cfg.encoder.lower() == "drqv2":
+        kwargs["num_features"] = cfg.encoder_num_features
+    return make_encoder(cfg.encoder.lower(), **kwargs)

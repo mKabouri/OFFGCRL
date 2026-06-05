@@ -60,6 +60,7 @@ class ValueNetwork(nn.Module):
     activations: Sequence[callable] = nn.gelu
     kernel_init: callable = default_init()
     ensemble_size: int = 2
+    encoder: nn.Module = None
 
     def setup(self):
         if self.ensemble_size > 1:
@@ -86,9 +87,24 @@ class ValueNetwork(nn.Module):
         goals: jnp.ndarray | None = None,
         actions: jnp.ndarray | None = None,
     ) -> jnp.ndarray:
+        if self.encoder is not None:
+            obs = self.encoder(obs)
+            if goals is not None:
+                goals = self.encoder(goals)
         x = combine_inputs(obs, goals, actions)
         v = self.mlp(x)
         return v.squeeze(axis=-1)
+
+
+class QNetwork(ValueNetwork):
+    @nn.compact
+    def __call__(
+        self,
+        obs: jnp.ndarray,
+        goals: jnp.ndarray | None = None,
+        actions: jnp.ndarray | None = None,
+    ) -> jnp.ndarray:
+        return super().__call__(obs, goals, actions)
 
 
 class BilinearValueNetwork(nn.Module):
@@ -97,6 +113,7 @@ class BilinearValueNetwork(nn.Module):
     kernel_init: callable = default_init()
     latent_dim: int = 256
     ensemble_size: int = 2
+    encoder: nn.Module = None
 
     def setup(self):
         if self.ensemble_size > 1:
@@ -134,6 +151,9 @@ class BilinearValueNetwork(nn.Module):
     def __call__(
         self, obs: jnp.ndarray, goal_obs: jnp.ndarray, actions: jnp.ndarray | None = None
     ) -> tuple[jnp.ndarray, jnp.ndarray, jnp.ndarray]:
+        if self.encoder is not None:
+            obs = self.encoder(obs)
+            goal_obs = self.encoder(goal_obs)
         phi_inputs = combine_inputs(obs, actions=actions)
         phi_out = self.phi(phi_inputs)
         psi_out = self.psi(goal_obs)
@@ -152,9 +172,6 @@ class BilinearCriticNetwork(BilinearValueNetwork):
 
 
 class ActorNetwork(nn.Module):
-    """
-    Gaussian policy network
-    """
     hidden_dims: Sequence[int]
     action_dim: int
     activations: callable = nn.gelu
@@ -162,6 +179,7 @@ class ActorNetwork(nn.Module):
     log_std_min: float = -5.0
     log_std_max: float = 2.0
     const_std: bool = False
+    encoder: nn.Module = None
 
     def setup(self):
         self.mlp = LayerNormMLP(
@@ -175,8 +193,20 @@ class ActorNetwork(nn.Module):
         if not self.const_std:
             self.log_std_layer = nn.Dense(self.action_dim, kernel_init=self.kernel_init)
 
+    def encode_observation(self, obs: jnp.ndarray) -> jnp.ndarray:
+        return self.encoder(obs) if self.encoder is not None else obs
+
     @nn.compact
-    def __call__(self, obs: jnp.ndarray, goals: jnp.ndarray | None = None) -> distrax.Distribution:
+    def __call__(
+        self,
+        obs: jnp.ndarray,
+        goals: jnp.ndarray | None = None,
+        goal_encoded: bool = False,
+    ) -> distrax.Distribution:
+        if self.encoder is not None:
+            obs = self.encoder(obs)
+            if goals is not None and not goal_encoded:
+                goals = self.encoder(goals)
         x = combine_inputs(obs, goals)
         x = self.mlp(x)
         means = self.mean_layer(x)
@@ -186,5 +216,38 @@ class ActorNetwork(nn.Module):
             log_stds = self.log_std_layer(x)
         log_stds = jnp.clip(log_stds, self.log_std_min, self.log_std_max)
         stds = jnp.exp(log_stds)
-        dist = distrax.MultivariateNormalDiag(means, stds)
-        return dist
+        return distrax.MultivariateNormalDiag(means, stds)
+
+class ActorVectorFieldNetwork(nn.Module):
+    hidden_dims: Sequence[int]
+    action_dim: int
+    activations: callable = nn.gelu
+    kernel_init: callable = default_init()
+    encoder: nn.Module = None
+
+    def setup(self):
+        self.mlp = LayerNormMLP(
+            hidden_dims=(*self.hidden_dims, self.action_dim),
+            activations=self.activations,
+            activate_final=False,
+            kernel_init=self.kernel_init,
+            layer_norm=True,
+        )
+ 
+    @nn.compact
+    def __call__(
+        self,
+        obs: jnp.ndarray,
+        goals: jnp.ndarray | None = None,
+        actions: jnp.ndarray | None = None,
+        times: jnp.ndarray | None = None,
+        goal_encoded: bool = False,
+    ) -> jnp.ndarray:
+        if not goal_encoded and self.encoder is not None:
+            obs = self.encoder(obs)
+            if goals is not None:
+                goals = self.encoder(goals)
+        parts = [p for p in (obs, goals, actions, times) if p is not None]
+        inputs = jnp.concatenate(parts, axis=-1)
+        return self.mlp(inputs)
+

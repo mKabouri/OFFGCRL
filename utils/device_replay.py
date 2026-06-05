@@ -2,7 +2,7 @@ import jax
 import jax.numpy as jnp
 
 
-def make_device_replay_sampler(replay_buffer, agent_name: str, batch_size: int, reward_type: str):
+def make_device_replay_sampler(replay_buffer, batch_size: int, reward_type: str):
     observations = jax.device_put(jnp.asarray(replay_buffer.observations))
     actions = jax.device_put(jnp.asarray(replay_buffer.actions))
     next_observations = jax.device_put(jnp.asarray(replay_buffer.next_observations))
@@ -28,26 +28,23 @@ def make_device_replay_sampler(replay_buffer, agent_name: str, batch_size: int, 
             use_current_goal = jax.random.uniform(cur_goal_rng, (batch_size,)) < current_goal_probability
             goal_idx = jnp.where(use_current_goal, idx, goal_idx)
 
+        achieved = (idx == goal_idx).astype(jnp.float32)
+        rewards = achieved - 1.0 if reward_type == "neg_one_zero" else achieved
+
         batch = {
             "observations": observations[idx],
             "actions": actions[idx],
             "goals": observations[goal_idx],
+            "next_observations": next_observations[idx],
+            "rewards": rewards,
+            "masks": 1.0 - achieved,
+            "dones": achieved,
             "indices": idx,
             "goal_indices": goal_idx,
         }
 
-        if agent_name == "hiql":
-            achieved = (idx == goal_idx).astype(jnp.float32)
-            rewards = achieved - 1.0 if reward_type == "neg_one_zero" else achieved
-            batch.update(
-                {
-                    "next_observations": next_observations[idx],
-                    "dones": achieved,
-                    "rewards": rewards,
-                    "masks": 1.0 - achieved,
-                    "subgoal_observations": subgoal_observations[idx],
-                }
-            )
+        if subgoal_observations is not None:
+            batch["subgoal_observations"] = subgoal_observations[idx]
 
         return batch
 
