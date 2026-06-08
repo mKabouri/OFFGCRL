@@ -1,10 +1,10 @@
 # OFFGCRL: OFFline Goal-Conditioned Reinforcement Learning
 
-This repository contains the implementation of CRL and HIQL algorithms for goal-conditioned offline reinforcement learning. It should support both image-based and proprioceptive state-based environments from [OGBench](https://seohong.me/projects/ogbench/).
+This repository contains the implementation of CRL, HIQL, and FQL algorithms for goal-conditioned offline reinforcement learning. It should support both image-based and proprioceptive state-based environments from [OGBench](https://seohong.me/projects/ogbench/).
 
 ## TODO:
 
-- Add more algorithms: DQC, FQL, TDInfoNCE, Infom, HILP
+- Add more algorithms: DQC, TDInfoNCE, Infom, HILP
 
 ## Run Training Example:
 
