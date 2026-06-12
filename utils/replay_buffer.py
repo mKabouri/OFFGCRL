@@ -80,7 +80,7 @@ class GCRLReplayBuffer(Dataset):
         reward_type: Literal["neg_one_zero", "zero_one"] = "neg_one_zero",
     ) -> dict[str, jnp.ndarray]:
         idx, goal_idx, goals = self.sample_indices_and_goals(batch_size)
-        batch = self.get_batch(idx, "observations", "actions")
+        batch = self.get_batch(idx, "observations", "actions", "next_observations")
         batch["goals"] = jnp.asarray(goals)
         batch["indices"] = jnp.asarray(idx)
         batch["goal_indices"] = jnp.asarray(goal_idx)

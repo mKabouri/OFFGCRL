@@ -34,7 +34,7 @@ def init_wandb(cfg, agent_cfg: ml_collections.ConfigDict = None, **kwargs):
 
     wandb.init(
         config=config,
-        reinit=True,
+        reinit="finish_previous",
         **clean_kwargs,
     )
 
